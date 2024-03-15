@@ -17,6 +17,9 @@ typedef struct RBTree
     RNode *root;
     size_t size;
     size_t type_size;
+    bool (*greater)(const void *, const void *);
+    bool (*less)(const void *, const void *);
+    void (*free_data)(void *);
 } RBTree;
 
 static RNode *rnode_init(void *data)
@@ -27,17 +30,36 @@ static RNode *rnode_init(void *data)
     return (node);
 }
 
-RBTree *rbtree_init(size_t type_size)
+RBTree *rbtree_init(size_t type_size,
+    bool (*greater)(const void *, const void *),
+    bool (*less)(const void *, const void *),
+    void (*free_data)(void *))
 {
     RBTree *tree = (RBTree *)malloc(sizeof(RBTree));
-    tree->type_size = type_size;
-    tree->size = 0;
     tree->root = NULL;
+    tree->size = 0;
+    tree->type_size = type_size;
+    tree->greater = greater;
+    tree->less = less;
+    tree->free_data = free_data;
     return (tree);
+}
+
+static void rbtree_destroy_node(RBTree *tree, RNode *node)
+{
+    if (node == NULL)
+        return;
+    
+    rbtree_destroy_node(tree, node->left);
+    rbtree_destroy_node(tree, node->right);
+    if (tree->free_data != NULL)
+        tree->free_data(node->data);
+    free(node);
 }
 
 void rbtree_destroy(RBTree *tree)
 {
+    rbtree_destroy_node(tree, tree->root);
     free(tree);
 }
 
@@ -54,11 +76,10 @@ static void rbtree_insert_node(RNode **root, void *data,
         rbtree_insert_node(&(*root)->right, data, greater, less);
 }
 
-void rbtree_insert(RBTree *tree, void *data, 
-    bool (*greater)(const void *, const void *),
-    bool (*less)(const void *, const void *))
+void rbtree_insert(RBTree *tree, void *data)
 {
-    rbtree_insert_node(&tree->root, data, greater, less);
+    rbtree_insert_node(&tree->root, data, tree->greater, tree->less);
+    tree->size++;
 }
 
 static void rbtree_inorder_root(RNode *root, void (*print)(void *))

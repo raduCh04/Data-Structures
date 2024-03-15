@@ -16,6 +16,8 @@ typedef struct RList
     RNode *tail;
     size_t size;
     size_t type_size;
+    void (*free_data)(void *);
+    int64_t (*compare)(void *, void *);
 } RList;
 
 static RNode *rnode_create(void *data)
@@ -26,13 +28,22 @@ static RNode *rnode_create(void *data)
     return (new_node);
 }
 
-RList *rlist_init(size_t type_size)
+static void rnode_destroy(RList *list, RNode *node)
+{
+    if (list->free_data != NULL)
+        list->free_data(node->data);
+    free(node);
+}
+
+RList *rlist_init(size_t type_size, int64_t (*compare)(void *, void *), void (*free_data)(void *))
 {
     RList *list = (RList *)malloc(sizeof(RList)); //TODO: Check error
     list->head = NULL;
     list->tail = NULL;
     list->size = 0;
     list->type_size = type_size;
+    list->compare = compare;
+    list->free_data = free_data;
     return (list);
 }
 
@@ -42,7 +53,7 @@ void rlist_destroy(RList *list)
     while (current != NULL)
     {
         RNode *next = current->next;
-        free(current);
+        rnode_destroy(list, current);
         current = next;
     }
     free(list);
@@ -91,11 +102,11 @@ void rlist_insert_at(RList *list, void *data, size_t index)
     list->size++;
 }
 
-void rlist_insert_sorted(RList *list, void *data, int64_t (*compare)(const void *, const void *))
+void rlist_insert_sorted(RList *list, void *data)
 {
-    if (compare(data, list->head->data) >= 0)
+    if (list->compare(data, list->head->data) >= 0)
         rlist_insert_front(list, data);
-    else if (compare(list->tail->data, data) >= 0)
+    else if (list->compare(list->tail->data, data) >= 0)
         rlist_insert_back(list, data);
     else
     {
@@ -105,7 +116,7 @@ void rlist_insert_sorted(RList *list, void *data, int64_t (*compare)(const void 
 
         while (current != NULL)
         {
-            if (compare(prev->data, data) >= 0 && compare(data, current->data) >= 0)
+            if (list->compare(prev->data, data) >= 0 && list->compare(data, current->data) >= 0)
             {
                 prev->next = new_node;
                 new_node->next = current;
@@ -115,7 +126,6 @@ void rlist_insert_sorted(RList *list, void *data, int64_t (*compare)(const void 
             current = current->next;
         }
     }
-
 }
 
 void rlist_insert_back(RList *list, void *data)
@@ -137,7 +147,7 @@ void rlist_insert_back(RList *list, void *data)
 void rlist_remove_front(RList *list)
 {
     RNode *current = list->head->next;
-    free(list->head);
+    rnode_destroy(list, list->head);
     list->head = current;
     list->size--;
 }
@@ -148,7 +158,7 @@ void rlist_clear(RList *list)
     while (current != NULL)
     {
         RNode *next = current->next;
-        free(current);
+        rnode_destroy(list, current);
         current = next;
     }
     list->head = list->tail = NULL;
@@ -163,7 +173,7 @@ void rlist_remove_back(RList *list)
         prev = current;
         current = current->next;
     }
-    free(current);
+    rnode_destroy(list, current);
     prev->next = NULL;
     list->tail = prev;
     list->size--;
@@ -184,7 +194,7 @@ void rlist_remove(RList *list, void *element)
             else
             {
                 prev->next = current->next;
-                free(current);
+                rnode_destroy(list, current);
             } return;
         }
         prev = current;
@@ -212,7 +222,7 @@ void rlist_remove_at(RList *list, size_t index)
             current = current->next;
         }
         prev->next = current->next;
-        free(current);
+        rnode_destroy(list, current);
     }
 }
 
@@ -289,14 +299,14 @@ int64_t rlist_contains_at(const RList *list, const void *element)
     return (-1);
 }
 
-bool rlist_is_sorted(const RList *list, int64_t (*compare)(const void *, const void *))
+bool rlist_is_sorted(const RList *list)
 {
     RNode *prev = list->head;
     RNode *current = list->head->next; 
 
     while (current != NULL)
     {
-        if (compare(prev->data, current->data) < 0)
+        if (list->compare(prev->data, current->data) < 0)
             return (false);
         prev = current;
         current = current->next;

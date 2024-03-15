@@ -9,7 +9,7 @@ typedef struct RQueue { RList *list; } RQueue;
 RQueue *rqueue_init(size_t type_size)
 {
     RQueue *queue = (RQueue *)malloc(sizeof(RQueue));
-    queue->list = rlist_init(type_size);
+    queue->list = rlist_init(type_size, NULL, NULL);
     return (queue);
 }
 

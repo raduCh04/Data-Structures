@@ -10,7 +10,7 @@ typedef struct RStack { RList *list; } RStack;
 RStack *rstack_init(size_t type_size)
 {
     RStack *stack = (RStack *)malloc(sizeof(RStack)); //TODO: Check for errors
-    stack->list = rlist_init(type_size); 
+    stack->list = rlist_init(type_size, NULL, NULL); 
     return (stack);
 }
 
